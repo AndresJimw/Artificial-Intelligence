@@ -80,8 +80,13 @@ def predict_face(rgb_face):
     idx = int(np.argmax(p))
     return labels[idx], float(p[1]), float(p[0])
 
-# INTERFAZ
+# control de umbral
 st.caption("Sube/toma una imagen o selecciona una del conjunto **test**. El modelo detecta y clasifica el rostro.")
+thr_andres = st.slider(
+    "Umbral mínimo para decidir 'Andres'",
+    min_value=0.90, max_value=0.9999, value=0.997, step=0.0001,
+    help="Si p(Andres) < umbral, se decide 'Fondo' para evitar falsos positivos."
+)
 
 mode = st.radio(
     "Modo de prueba",
@@ -132,15 +137,19 @@ if img_rgb is not None:
             st.write(f"p(Fondo) = **{p_fondo:.3f}**")
             st.progress(min(1.0, max(0.0, p_andres)), text="Probabilidad de 'Andres'")
     else:
-        label, p_andres, p_fondo = predict_face(face)
+        # Probabilidades del modelo
+        label_argmax, p_andres, p_fondo = predict_face(face)
+        # decisión por umbral conservador
+        label = "Andres" if p_andres >= thr_andres else "Fondo"
 
         col1, col2 = st.columns([1,1])
         with col1:
             st.image(face, caption="Rostro detectado")
         with col2:
             st.subheader(f"Predicción: {label}")
-            st.write(f"p(Andres) = **{p_andres:.3f}**")
+            st.write(f"p(Andres) = **{p_andres:.3f}**  (umbral = {thr_andres:.4f})")
             st.write(f"p(Fondo) = **{p_fondo:.3f}**")
+            st.caption(f"Argmax original del modelo: {label_argmax}")
             st.progress(min(1.0, max(0.0, p_andres)), text="Probabilidad de 'Andres'")
 
     st.markdown("---")
