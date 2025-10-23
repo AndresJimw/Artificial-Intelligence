@@ -14,3 +14,13 @@ downloads/
 videos/
 *.mp4
 *.jpg
+
+Lab05/models/
+*.keras
+*.h5
+*.pkl
+# Modelos grandes
+Lab05/models/
+*.keras
+*.h5
+*.pkl
