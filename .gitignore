@@ -13,7 +13,6 @@ external/
 downloads/
 videos/
 *.mp4
-*.jpg
 
 Lab05/models/
 *.keras
@@ -24,3 +23,5 @@ Lab05/models/
 *.keras
 *.h5
 *.pkl
+
+Lab05/
