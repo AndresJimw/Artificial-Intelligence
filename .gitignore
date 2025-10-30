@@ -25,3 +25,5 @@ Lab05/models/
 *.pkl
 
 Lab05/
+
+*.pt
