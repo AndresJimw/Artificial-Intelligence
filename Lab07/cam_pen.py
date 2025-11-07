@@ -56,18 +56,61 @@ latest_jpeg = None
 lock = threading.Lock()
 running = True
 
+def is_jetson():
+    return os.path.exists("/etc/nv_tegra_release")
+
+def list_video_devices():
+    base = Path("/dev")
+    if not base.exists():
+        return []
+    return sorted([int(p.name.replace("video",""))
+                   for p in base.glob("video*")
+                   if p.name.replace("video","").isdigit()])
+
+def gstreamer_pipeline(sensor_id=0, capture_width=1280, capture_height=720,
+                       display_width=640, display_height=480, framerate=30, flip_method=0):
+    return (
+        f"nvarguscamerasrc sensor-id={sensor_id} ! "
+        f"video/x-raw(memory:NVMM), width=(int){capture_width}, height=(int){capture_height}, "
+        f"format=(string)NV12, framerate=(fraction){framerate}/1 ! "
+        f"nvvidconv flip-method={flip_method} ! "
+        f"video/x-raw, width=(int){display_width}, height=(int){display_height}, format=(string)BGRx ! "
+        f"videoconvert ! video/x-raw, format=(string)BGR ! appsink"
+    )
+
+def open_camera_linux_or_jetson(preferred_index=0, width=640, height=480):
+    indices = list_video_devices()
+    candidates = [preferred_index] + [i for i in indices if i != preferred_index] if indices else [preferred_index]
+    for idx in candidates:
+        cap = cv2.VideoCapture(idx, cv2.CAP_V4L2)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH,  width)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+        if cap.isOpened():
+            print(f"[INFO] Cámara V4L2 abierta en /dev/video{idx}")
+            return cap
+
+    if is_jetson():
+        for sid in (0, 1):  # pruebo hasta dos sensores comunes
+            pipe = gstreamer_pipeline(sensor_id=sid, display_width=width, display_height=height, framerate=30)
+            cap = cv2.VideoCapture(pipe, cv2.CAP_GSTREAMER)
+            if cap.isOpened():
+                print(f"[INFO] Cámara CSI abierta con GStreamer (sensor-id={sid})")
+                return cap
+
+    return None
+
 def capture_and_detect():
     global latest_jpeg, running
-    # MÍNIMO cambio: CAP_DSHOW solo en Windows
     if platform.system() == "Windows":
         cap = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     else:
-        cap = cv2.VideoCapture(CAM_INDEX)
+        cap = open_camera_linux_or_jetson(preferred_index=CAM_INDEX, width=640, height=480)
 
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    if not cap.isOpened():
-        raise RuntimeError("No se pudo abrir la cámara. Prueba CAM_INDEX=1.")
+    if cap is None or not cap.isOpened():
+        raise RuntimeError("No se pudo abrir la cámara. Prueba CAM_INDEX=1 o conecta una cámara USB. "
+                           "En Jetson, asegúrate de tener una cámara CSI/USB compatible y GStreamer habilitado.")
 
     last_t, fps = time.time(), 0.0
     try:
