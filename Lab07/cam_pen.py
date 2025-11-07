@@ -39,7 +39,7 @@ if not Path(WEIGHTS).exists():
 CAM_INDEX = 0  # prueba 1 si 0 no abre
 
 # === HIPERPARÁMETROS ===
-CONF, IOU = 0.02, 0.60
+CONF, IOU = 0.03, 0.60
 IMGSZ, MAX_DET = 640, 40
 DEVICE = "cpu"  # en Jetson con GPU: "cuda"
 
