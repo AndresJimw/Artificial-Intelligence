@@ -1,12 +1,40 @@
+import os, platform
 import cv2, time, threading
 from ultralytics import YOLO
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# === RUTAS ===
-WEIGHTS = r"D:\Archivos de Usuario\Documents\Artificial-Intelligence\runs\detect\custom_yolo_model\weights\best.pt"
+# 1) Intentar ruta fija de Windows
+DEFAULT_WIN_PATH = r"D:\Archivos de Usuario\Documents\Artificial-Intelligence\runs\detect\custom_yolo_model\weights\best.pt"
+
+# 2) Si hay variable de entorno WEIGHTS, úsala
+env_weights = os.getenv("WEIGHTS")
+if env_weights and Path(env_weights).expanduser().exists():
+    WEIGHTS = str(Path(env_weights).expanduser())
+# 3) Si no, usa la ruta por defecto
+elif Path(DEFAULT_WIN_PATH).exists():
+    WEIGHTS = DEFAULT_WIN_PATH
+else:
+    # 4) Búsqueda automática relativa al script o al cwd (Linux/servidor)
+    candidates = []
+    here = Path(__file__).resolve().parent
+    rel = Path("runs/detect/custom_yolo_model/weights/best.pt")
+    # Probar en:
+    for base in {here, here.parent, Path.cwd()}:
+        p = (base / rel).resolve()
+        candidates.append(p)
+        if p.exists():
+            WEIGHTS = str(p)
+            break
+    else:
+        raise FileNotFoundError(
+            "No encuentro el modelo 'best.pt'. Define WEIGHTS o coloca el peso en:\n"
+            + "\n".join(f"- {c}" for c in candidates)
+        )
+
+# Comprobación final
 if not Path(WEIGHTS).exists():
-    raise FileNotFoundError(f"No encuentro el modelo en:\n{WEIGHTS}\nVerifica la ruta.")
+    raise FileNotFoundError(f"No encuentro el modelo en:\n{WEIGHTS}\nVerifica la ruta o define WEIGHTS.")
 
 CAM_INDEX = 0  # prueba 1 si 0 no abre
 
@@ -30,7 +58,12 @@ running = True
 
 def capture_and_detect():
     global latest_jpeg, running
-    cap = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
+    # MÍNIMO cambio: CAP_DSHOW solo en Windows
+    if platform.system() == "Windows":
+        cap = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
+    else:
+        cap = cv2.VideoCapture(CAM_INDEX)
+
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     if not cap.isOpened():
