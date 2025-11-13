@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from openai import OpenAI
+import openai
 
 
 st.set_page_config(
@@ -34,15 +34,23 @@ with st.sidebar:
     )
 
 
+# -------------------------
+# Validaciones
+# -------------------------
 if not api_key:
     st.info("Introduce tu API key para continuar.")
     st.stop()
+
+openai.api_key = api_key
 
 if uploaded_file is None:
     st.info("Sube el CSV filtrado para continuar.")
     st.stop()
 
 
+# -------------------------
+# Carga del CSV
+# -------------------------
 try:
     df = pd.read_csv(uploaded_file)
 except Exception as e:
@@ -54,9 +62,9 @@ for col in df.columns:
 
 data_context = df.to_csv(index=False)
 
-client = OpenAI(api_key=api_key)
-
-
+# -------------------------
+# Prompt del sistema
+# -------------------------
 SYSTEM_PROMPT = f"""
 Eres un asistente especializado en la oferta de programas de POSGRADO EN LÍNEA
 de la provincia de Pichincha (Ecuador).
@@ -98,13 +106,13 @@ if user_prompt:
     try:
         with st.chat_message("assistant"):
             with st.spinner("Pensando..."):
-                response = client.chat.completions.create(
+                response = openai.ChatCompletion.create(
                     model=model_name,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=800,
                 )
-                answer = response.choices[0].message.content
+                answer = response.choices[0].message["content"]
                 st.markdown(answer)
 
         st.session_state.chat.append({"role": "assistant", "content": answer})
